@@ -1,0 +1,28 @@
+ Futsal
+Date et heure : 2024-11-11 21:44:01
+
+¤Joueur 1
+  £But£: 0
+  £Passe décisive£: 0
+  £Duel Gagné£: 0
+
+¤Joueur 2
+  £But£: 0
+  £Passe décisive£: 0
+  £Duel Gagné£: 0
+
+¤Joueur 3
+  £But£: 0
+  £Passe décisive£: 0
+  £Duel Gagné£: 0
+
+¤Joueur 4
+  £But£: 0
+  £Passe décisive£: 0
+  £Duel Gagné£: 0
+
+¤Joueur 5
+  £But£: 0
+  £Passe décisive£: 0
+  £Duel Gagné£: 0
+

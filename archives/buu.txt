@@ -1,0 +1,13 @@
+ Duel
+Date et heure : 2024-11-11 21:44:10
+
+¤Joueur 1
+  £Var 1£: 0
+  £Var 2£: 0
+  £Var 3£: 0
+
+¤Joueur 2
+  £Var 1£: 0
+  £Var 2£: 0
+  £Var 3£: 0
+
