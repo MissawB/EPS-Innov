@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from kivy.core.window import Window
 from kivy.uix.button import Button
@@ -13,6 +12,7 @@ from kivy.graphics import Color, Rectangle
 from kivy.uix.widget import Widget
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.popup import Popup
+from kivy.storage.jsonstore import JsonStore
 
 class DuelScreen(Screen):
     def __init__(self, **kwargs):
@@ -287,58 +287,77 @@ class DuelScreen(Screen):
         hours, minutes = divmod(minutes, 60)
         self.timer_label.text = f"{'Timer' if self.is_timer_mode else 'Chrono'}: {hours:02}:{minutes:02}:{seconds:02}"
 
+        # Changer nom de l'archive
+
     def archive_data(self, instance):
-        # Création du popup pour entrer le nom du fichier
+        """Affiche un popup pour saisir le nom de l'archive."""
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
 
-        # Label pour le titre
-        label = Label(text="Entrez le nom de l'archive :",
-                      size_hint_y=None, height=40)
+        # Label de titre
+        label = Label(text="Entrez le nom de l'archive :", size_hint_y=None, height=40)
         layout.add_widget(label)
 
-        # Champ de saisie pour le nom de l'archive
+        # Champ de saisie du nom de l'archive
         archive_name_input = TextInput(text="", font_size=16, size_hint_y=None, height=40)
         layout.add_widget(archive_name_input)
 
-        # Bouton pour confirmer et créer l'archive
+        # Bouton pour archiver
         confirm_button = Button(text="Archiver", size_hint_y=None, height=50)
         confirm_button.bind(on_release=lambda x: self.save_archive(archive_name_input.text, popup))
         layout.add_widget(confirm_button)
 
-        # Création et ouverture du popup
+        # Popup pour saisir le nom
         popup = Popup(title="Choisir un nom d'archive", content=layout, size_hint=(0.8, 0.5))
         popup.open()
 
     def save_archive(self, custom_name, popup):
-        archive_dir = "archives"
-        os.makedirs(archive_dir, exist_ok=True)
+        """Crée et enregistre une archive au même endroit que précédemment, dans un répertoire 'archives'."""
+        archive_dir = 'archives'
 
-        # Si aucun nom n'est saisi, utilise le nom par défaut
+        # 🗂️ Initialisation du fichier de stockage JSON pour garantir la persistance
+        store = JsonStore(f'{archive_dir}/temp.json')
+
+        # 🗂️ Si l'utilisateur n'a pas défini de nom, on génère un nom par défaut avec la date/heure
         if not custom_name:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{archive_dir}/archive_Duel_{timestamp}.txt"
+            archive_name = f"archive_Duel_{timestamp}"
         else:
-            filename = f"{archive_dir}/{custom_name}.txt"
+            archive_name = custom_name
 
-        # Obtenir la date et l'heure actuelles
+        # 📅 Obtenir la date et l'heure actuelles
         date_heure = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Sauvegarde des données dans le fichier
-        with open(filename, 'w') as f:
-            # Écrire "Duel" pour indiquer le mode et ajouter la date et l'heure
-            f.write(" Duel\n")
-            f.write(f"Date et heure : {date_heure}\n\n")
+        # 📁 Créer le chemin complet de l'archive
+        archive_path = f'{archive_dir}/{archive_name}.txt'
 
-            # Écrire les données des joueurs
-            for player, data in self.players_data.items():
-                f.write(f"¤{player}\n")
-                for obs_name, obs_data in data['observables'].items():
-                    f.write(f"  £{obs_name}£: {obs_data['score']}\n")
-                f.write(f"\n")
+        # ⚙️ Formater les données des joueurs
+        cleaned_players_data = {}
+        for player, data in self.players_data.items():
+            cleaned_players_data[player] = {
+                'observables': {obs_name: {'score': obs_data['score']} for obs_name, obs_data in
+                                data['observables'].items()}
+            }
 
-        print(f"Data archived to {filename}")
+        # 📝 Sauvegarder les données dans le fichier au format texte
+        try:
+            # Écrire les données au format texte dans le fichier
+            with open(archive_path, 'w', encoding='utf-8') as f:
+                # Écrire "Duel" pour indiquer le mode et la date
+                f.write(" Duel\n")
+                f.write(f"Date et heure : {date_heure}\n\n")
 
-        # Fermer le popup après avoir archivé
+                # Écrire les données des joueurs
+                for player, data in cleaned_players_data.items():
+                    f.write(f"¤{player}\n")
+                    for obs_name, obs_data in data['observables'].items():
+                        f.write(f"  £{obs_name}£: {obs_data['score']}\n")
+                    f.write(f"\n")
+
+            print(f"✅ Données archivées dans : {archive_path}")
+        except Exception as e:
+            print(f"❌ Erreur lors de la création de l'archive : {e}")
+
+        # Fermer le popup après l'archivage
         popup.dismiss()
 
     def go_back(self, instance):

@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from kivy.core.window import Window
 from kivy.uix.button import Button
@@ -11,8 +10,7 @@ from kivy.clock import Clock
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.popup import Popup
-import logging
-logging.basicConfig(level=logging.DEBUG)
+from kivy.storage.jsonstore import JsonStore
 
 ################################ Écran des fonctionnalités ################################################
 class FeaturesScreen(Screen):
@@ -27,6 +25,7 @@ class FeaturesScreen(Screen):
         self.hours = 0
         self.minutes = 0
         self.seconds = 0
+        self.player_names = []  # Pour stocker les noms des joueurs
 
         main_layout = BoxLayout(orientation='vertical')
         top_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=50)
@@ -53,7 +52,7 @@ class FeaturesScreen(Screen):
         main_scroll_content.bind(minimum_height=main_scroll_content.setter('height'))
 
         # Spinner pour le nombre de joueurs
-        self.num_players_spinner = Spinner(text="3", values=["1", "2", "3", "4", "5"], size_hint=(1, None), height=50)
+        self.num_players_spinner = Spinner(text="3", values=[str(i) for i in range(1,11)], size_hint=(1, None), height=50)
         self.num_players_spinner.bind(text=self.update_num_players)
         main_scroll_content.add_widget(self.num_players_spinner)
 
@@ -75,7 +74,120 @@ class FeaturesScreen(Screen):
         self.add_widget(main_layout)
         self.update_num_players(None, "3")
 
-    from kivy.uix.button import Button
+    def on_enter(self, *args):
+        # Appelle la popup dès que l'utilisateur entre sur cet écran
+        self.show_init_popup()
+
+    def show_init_popup(self):
+        # Fonction appelée pour mettre à jour les champs des noms en fonction du nombre de joueurs
+        def update_name_fields(num_players):
+            players_layout.clear_widgets()  # Effacer les champs existants
+            name_inputs.clear()  # Réinitialiser la liste des champs
+
+            # Ajouter le bon nombre de champs pour les noms des joueurs
+            for i in range(num_players):
+                name_input = TextInput(
+                    hint_text=f"Nom du Joueur {i + 1}",
+                    size_hint=(1, None),
+                    height=50,
+                    multiline=False
+                )
+                if i < len(self.player_names):
+                    name_input.text = self.player_names[i]
+                else:
+                    name_input.text = f"Joueur {i + 1}"
+
+                name_inputs.append(name_input)
+                players_layout.add_widget(name_input)
+
+        # Fonction pour gérer l'incrémentation/décrémentation du nombre de joueurs
+        def change_num_players(change):
+            nonlocal num_players
+            num_players = max(1, min(20, num_players + change))  # Limiter entre 1 et 20 joueurs
+            num_players_label.text = f"Nombre de joueurs : {num_players}"
+            update_name_fields(num_players)
+
+        # Fonction appelée lors de la validation de la popup
+        def on_confirm(instance):
+            # Mettre à jour les noms et les données des joueurs
+            self.player_names = [name_inputs[i].text.strip() for i in range(num_players)]
+            self.players_data = {
+                self.player_names[i]: {
+                    'observables': {},
+                    'num_observables': 3,
+                    'dependencies': {}
+                }
+                for i in range(num_players)
+            }
+
+            # Mettre à jour l'affichage principal
+            self.update_num_players(None, str(num_players))
+            popup.dismiss()
+
+        # Initialisation du nombre de joueurs
+        num_players = 3
+
+        # Conteneur principal pour la popup
+        popup_layout = BoxLayout(orientation='vertical', spacing=10, padding=(20, 10))
+
+        # Titre
+        popup_layout.add_widget(
+            Label(text="Choisissez le nombre de joueurs", font_size=18, size_hint_y=None, height=40))
+
+        # Section pour ajuster le nombre de joueurs
+        player_count_section = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height=50)
+        decrease_btn = Button(text="-", size_hint=(0.2, 1))
+        decrease_btn.bind(on_release=lambda instance: change_num_players(-1))
+        increase_btn = Button(text="+", size_hint=(0.2, 1))
+        increase_btn.bind(on_release=lambda instance: change_num_players(1))
+        num_players_label = Label(text=f"Nombre de joueurs : {num_players}", size_hint=(0.6, 1))
+        player_count_section.add_widget(decrease_btn)
+        player_count_section.add_widget(num_players_label)
+        player_count_section.add_widget(increase_btn)
+        popup_layout.add_widget(player_count_section)
+
+        # Zone pour les champs de texte des noms des joueurs, avec ScrollView
+        scroll_view = ScrollView(size_hint=(1, 0.7))  # Limiter la hauteur à 70% de la popup
+        players_layout = GridLayout(cols=1, spacing=10, size_hint_y=None)
+        players_layout.bind(minimum_height=players_layout.setter('height'))
+
+        # Initialisation des champs pour 3 joueurs par défaut
+        name_inputs = []
+        update_name_fields(num_players)
+        scroll_view.add_widget(players_layout)
+        popup_layout.add_widget(scroll_view)
+
+        # Boutons pour valider ou annuler
+        button_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height=50)
+
+        confirm_button = Button(text="Valider", size_hint=(0.5, 1))
+        confirm_button.bind(on_release=on_confirm)
+        button_layout.add_widget(confirm_button)
+
+        cancel_button = Button(text="Annuler", size_hint=(0.5, 1))
+        cancel_button.bind(on_release=lambda instance: popup.dismiss())
+        button_layout.add_widget(cancel_button)
+
+        popup_layout.add_widget(button_layout)
+
+        # Création de la popup
+        popup = Popup(
+            title="Configuration Initiale",
+            content=popup_layout,
+            size_hint=(0.8, 0.9),  # Ajuster pour une taille agréable
+            auto_dismiss=False
+        )
+
+        # Afficher la popup
+        popup.open()
+
+    def on_name_change(self, instance, value):
+        # Met à jour le nom du joueur dans players_data
+        for player in list(self.players_data.keys()):
+            if instance.text != player:
+                if instance.text.strip() not in self.players_data:
+                    self.players_data[instance.text.strip()] = self.players_data.pop(player)
+                break
 
     def update_num_players(self, instance, num_players_text):
         try:
@@ -83,51 +195,153 @@ class FeaturesScreen(Screen):
         except (ValueError, IndexError):
             num_players = 3
 
+        # Assurez-vous que self.players_data utilise les bons noms
         self.players_data = {
-            f'Joueur {i + 1}': {
+            self.player_names[i] if i < len(self.player_names) else f'Joueur {i + 1}': {
                 'observables': {},
                 'num_observables': 3,
                 'dependencies': {}
             }
             for i in range(num_players)
         }
+
         self.players_layout.clear_widgets()
 
-        for player in self.players_data.keys():
-            main_player_layout = BoxLayout(orientation='vertical', padding=(0, 5), size_hint_y=None)
-            main_player_layout.bind(minimum_height=main_player_layout.setter('height'))
-            info_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=35)
+        for i, player in enumerate(self.players_data.keys()):
+            # Layout principal pour afficher uniquement les noms
+            player_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, padding=(5, 5))
 
-            name_input = TextInput(text=player, font_size=16, size_hint_x=0.4)
-            name_input.bind(text=self.on_name_change)
-            info_layout.add_widget(name_input)
-
-            spinner = Spinner(text="3", values=[str(i) for i in range(1,8)], size_hint_x=0.1)
-            spinner.bind(text=lambda instance, val, p=player: self.set_num_observables(p, int(val)))
-            info_layout.add_widget(spinner)
-
-            # Bouton avec une image au lieu du texte "Configurer"
-            config_button = Button(
-                background_normal="/Users/bahma/.spyder-py3/EPS'Innov/image/bouton_parametre.png",  # Chemin de l'image
-                size_hint_x=0.1,
-                background_down="/Users/bahma/.spyder-py3/EPS'Innov/image/bouton_parametre.png",  # Optionnel : même image lors du clic
-                border=(0, 0, 0, 0)  # Supprime les bordures
+            # Champ pour le nom
+            name_input = TextInput(
+                text=player,
+                font_size=21,
+                size_hint_x=0.7
             )
-            config_button.bind(on_release=lambda instance, p=player: self.show_player_config_popup(p))
-            info_layout.add_widget(config_button)
+            name_input.bind(
+                text=lambda instance, p=player: self.on_name_change(p, instance.text)
+            )
+            player_layout.add_widget(name_input)
 
-            main_player_layout.add_widget(info_layout)
-            variables_layout = GridLayout(cols=4, size_hint_y=None, padding=5, spacing=2)
-            self.players_data[player]['layout'] = variables_layout
-            main_player_layout.add_widget(variables_layout)
-            self.update_observables_layout(player)
-            self.players_layout.add_widget(main_player_layout)
+            # Bouton pour ouvrir la configuration dans une popup
+            config_button = Button(
+                text="Variables",
+                size_hint_x=0.3,
+                height=60
+            )
+            config_button.bind(on_release=lambda instance, p=player: self.show_player_var_popup(p))
+            player_layout.add_widget(config_button)
 
-    def on_name_change(self, instance, value):
-        for player in list(self.players_data.keys()):
-            if instance in self.players_data[player]['layout'].children:
-                self.players_data[value] = self.players_data.pop(player)
-                break
+            self.players_layout.add_widget(player_layout)
+
+    def show_player_var_popup(self, player):
+        # Si une popup est déjà ouverte, la fermer avant d'en créer une nouvelle
+        if hasattr(self, 'popup') and self.popup:
+            self.popup.dismiss()
+            self.popup = None
+
+        # Nettoyer le layout existant dans players_data pour éviter les conflits
+        if 'layout' in self.players_data[player]:
+            old_layout = self.players_data[player].pop('layout', None)
+            if old_layout:
+                old_layout.clear_widgets()
+
+        # Conteneur principal
+        content = BoxLayout(orientation='vertical', spacing=10, padding=(20, 10))
+
+        # Zone principale pour le joueur
+        main_player_layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
+        main_player_layout.bind(minimum_height=main_player_layout.setter('height'))
+
+        # Ligne d'informations avec le TextInput, le Spinner et le bouton d'image
+        info_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=10)
+
+        # Champ de texte pour le nom
+        name_input = TextInput(
+            text=player,
+            font_size=16,
+            size_hint_x=0.5,
+            multiline=False,
+            hint_text="Nom du joueur"
+        )
+        name_input.bind(text=self.on_name_change)
+        info_layout.add_widget(name_input)
+
+        # Spinner pour le nombre d'observables
+        spinner = Spinner(
+            text=str(self.players_data[player].get('num_observables', 3)),  # Par défaut, 3 observables
+            values=[str(i) for i in range(1, 6)],
+            size_hint_x=0.2,
+            size_hint_y=None,
+            height=50
+        )
+        spinner.bind(
+            text=lambda instance, val, p=player: self.set_num_observables(p, int(val))
+        )
+        info_layout.add_widget(spinner)
+
+        # Bouton d'image pour la configuration
+        config_button = Button(
+            background_normal="/Users/bahma/.spyder-py3/EPS'Innov/image/bouton_parametre.png",
+            background_down="/Users/bahma/.spyder-py3/EPS'Innov/image/bouton_parametre.png",
+            size_hint_x=0.09,
+            size_hint_y=None,
+            height=50,
+            border=(0, 0, 0, 0)
+        )
+        config_button.bind(on_release=lambda instance, p=player: self.show_player_config_popup(p))
+        info_layout.add_widget(config_button)
+
+        # Ajouter le layout des informations au layout principal
+        main_player_layout.add_widget(info_layout)
+
+        # Grille pour les variables du joueur
+        variables_layout = GridLayout(
+            cols=4,  # 4 colonnes
+            spacing=10,
+            padding=10,
+            size_hint_y=None,
+            height=150
+        )
+        self.players_data[player]['layout'] = variables_layout
+
+        # Mise à jour de la disposition des observables
+        self.update_observables_layout(player)
+
+        # Ajouter le layout des variables
+        main_player_layout.add_widget(variables_layout)
+
+        # Ajout du layout principal des joueurs à la popup
+        scroll_view = ScrollView(size_hint=(1, 0.8))
+        scroll_view.add_widget(main_player_layout)
+        content.add_widget(scroll_view)
+
+        # Bouton pour fermer la popup
+        close_button = Button(
+            text="Fermer",
+            size_hint_y=None,
+            height=50
+        )
+        close_button.bind(on_release=self.close_popup)
+        content.add_widget(close_button)
+
+        # Création et affichage de la popup
+        self.popup = Popup(
+            title=f"Paramètres de {player}",
+            content=content,
+            size_hint=(0.9, 0.9),
+            auto_dismiss=False
+        )
+        self.popup.bind(on_dismiss=self.cleanup_popup)
+        self.popup.open()
+
+    def close_popup(self, instance):
+        """Ferme la popup."""
+        if hasattr(self, 'popup') and self.popup:
+            self.popup.dismiss()
+
+    def cleanup_popup(self, instance):
+        """Nettoie après fermeture."""
+        self.popup = None
 
     def set_num_observables(self, player, num_observables):
         self.players_data[player]['num_observables'] = num_observables
@@ -137,7 +351,10 @@ class FeaturesScreen(Screen):
         layout = self.players_data[player]['layout']
         layout.clear_widgets()
 
-        for i in range(self.players_data[player]['num_observables']):
+        num_observables = self.players_data[player].get('num_observables', 3)
+        layout.height = num_observables * 50
+
+        for i in range(num_observables):
             obs_name = f'Var {i + 1}'
             if obs_name not in self.players_data[player]['observables']:
                 self.players_data[player]['observables'][obs_name] = {
@@ -153,19 +370,17 @@ class FeaturesScreen(Screen):
             name_input = observable_data['name_input']
             score_label = observable_data['score_label']
 
-            # Stockage des dépendances
-            self.players_data[player]['dependencies'] = {}  # Réinitialiser les dépendances
-            self.players_data[player]['observables'][obs_name]['dependencies'] = {}
-
             # Mise à jour de l'affichage du score avec la valeur initiale
             score_label.text = str(observable_data['score'])
 
+            # Boutons pour augmenter/diminuer le score
             btn_increase = Button(text="+", size_hint=(0.1, 0.5), height=30)
             btn_increase.bind(on_press=lambda x, p=player, o=obs_name: self.update_score(p, o, 1))
 
             btn_decrease = Button(text="-", size_hint=(0.1, 0.5), height=30)
             btn_decrease.bind(on_press=lambda x, p=player, o=obs_name: self.update_score(p, o, -1))
 
+            # Ajouter les widgets à la grille
             layout.add_widget(name_input)
             layout.add_widget(score_label)
             layout.add_widget(btn_increase)
@@ -809,59 +1024,74 @@ class FeaturesScreen(Screen):
 
         #Changer nom de l'archive
     def archive_data(self, instance):
-        # Création du popup pour entrer le nom du fichier
+        """Affiche un popup pour saisir le nom de l'archive."""
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
 
-        # Label pour le titre
-        label = Label(text="Entrez le nom de l'archive :",
-                      size_hint_y=None, height=40)
+        # Label de titre
+        label = Label(text="Entrez le nom de l'archive :", size_hint_y=None, height=40)
         layout.add_widget(label)
 
-        # Champ de saisie pour le nom de l'archive
+        # Champ de saisie du nom de l'archive
         archive_name_input = TextInput(text="", font_size=16, size_hint_y=None, height=40)
         layout.add_widget(archive_name_input)
 
-        # Bouton pour confirmer et créer l'archive
+        # Bouton pour archiver
         confirm_button = Button(text="Archiver", size_hint_y=None, height=50)
         confirm_button.bind(on_release=lambda x: self.save_archive(archive_name_input.text, popup))
         layout.add_widget(confirm_button)
 
-        # Création et ouverture du popup
+        # Popup pour saisir le nom
         popup = Popup(title="Choisir un nom d'archive", content=layout, size_hint=(0.8, 0.5))
         popup.open()
 
-        #Sauvegarde d'archives
-
     def save_archive(self, custom_name, popup):
-        archive_dir = "archives"
-        os.makedirs(archive_dir, exist_ok=True)
+        """Crée et enregistre une archive au même endroit que précédemment, dans un répertoire 'archives'."""
+        archive_dir = 'archives'
 
-        # Si aucun nom n'est saisi, utilise le nom par défaut
+        # 🗂️ Initialisation du fichier de stockage JSON pour garantir la persistance
+        store = JsonStore(f'{archive_dir}/temp.json')
+
+        # 🗂️ Si l'utilisateur n'a pas défini de nom, on génère un nom par défaut avec la date/heure
         if not custom_name:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{archive_dir}/archive_Personnalisé_{timestamp}.txt"
+            archive_name = f"archive_Personnalisé_{timestamp}"
         else:
-            filename = f"{archive_dir}/{custom_name}.txt"
+            archive_name = custom_name
 
-        # Obtenir la date et l'heure actuelles
+        # 📅 Obtenir la date et l'heure actuelles
         date_heure = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Sauvegarde des données dans le fichier
-        with open(filename, 'w') as f:
-            # Écrire "Personnalisé" pour indiquer le mode et ajouter la date et l'heure
-            f.write(" Personnalisé\n")
-            f.write(f"Date et heure : {date_heure}\n\n")
+        # 📁 Créer le chemin complet de l'archive
+        archive_path = f'{archive_dir}/{archive_name}.txt'
 
-            # Écrire les données des joueurs
-            for player, data in self.players_data.items():
-                f.write(f"¤{player}\n")
-                for obs_name, obs_data in data['observables'].items():
-                    f.write(f"  £{obs_name}£: {obs_data['score']}\n")
-                f.write(f"\n")
+        # ⚙️ Formater les données des joueurs
+        cleaned_players_data = {}
+        for player, data in self.players_data.items():
+            cleaned_players_data[player] = {
+                'observables': {obs_name: {'score': obs_data['score']} for obs_name, obs_data in
+                                data['observables'].items()}
+            }
 
-        print(f"Data archived to {filename}")
+        # 📝 Sauvegarder les données dans le fichier au format texte
+        try:
+            # Écrire les données au format texte dans le fichier
+            with open(archive_path, 'w', encoding='utf-8') as f:
+                # Écrire "Personnalisé" pour indiquer le mode et la date
+                f.write(" Personnalisé\n")
+                f.write(f"Date et heure : {date_heure}\n\n")
 
-        # Fermer le popup après avoir archivé
+                # Écrire les données des joueurs
+                for player, data in cleaned_players_data.items():
+                    f.write(f"¤{player}\n")
+                    for obs_name, obs_data in data['observables'].items():
+                        f.write(f"  £{obs_name}£: {obs_data['score']}\n")
+                    f.write(f"\n")
+
+            print(f"✅ Données archivées dans : {archive_path}")
+        except Exception as e:
+            print(f"❌ Erreur lors de la création de l'archive : {e}")
+
+        # Fermer le popup après l'archivage
         popup.dismiss()
 
         #Retourner sur la page principale
