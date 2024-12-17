@@ -343,7 +343,7 @@ class DuelScreen(Screen):
             # Écrire les données au format texte dans le fichier
             with open(archive_path, 'w', encoding='utf-8') as f:
                 # Écrire "Duel" pour indiquer le mode et la date
-                f.write(" Duel\n")
+                f.write("Duel\n")
                 f.write(f"Date et heure : {date_heure}\n\n")
 
                 # Écrire les données des joueurs

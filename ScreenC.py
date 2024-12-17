@@ -1,10 +1,3 @@
-import os
-os.environ["KIVY_METRICS_DENSITY"] = "1"
-os.environ["KIVY_NO_ARGS"] = "1"
-os.environ["KIVY_NO_CONSOLELOG"] = "1"
-os.environ["KIVY_NO_FILELOG"] = "1"
-os.environ["KIVY_NO_PY2_LOGGING"] = "1"
-os.environ["KIVY_GL_BACKEND"] = 'angle_sdl2'
 from kivy.uix.button import Button
 from kivy.uix.label import Label
 from kivy.uix.boxlayout import BoxLayout

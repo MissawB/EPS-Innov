@@ -1,4 +1,4 @@
-import os
+import glob
 import subprocess  # Pour ouvrir le fichier sous Linux / macOS
 import openpyxl
 from kivy.uix.screenmanager import Screen
@@ -10,6 +10,8 @@ from kivy.uix.button import Button
 from kivy.uix.popup import Popup
 from kivy.uix.label import Label
 from kivy.uix.gridlayout import GridLayout
+from kivy.utils import platform
+from pathlib import Path
 
 class ArchivesScreen(Screen):
     def __init__(self, **kwargs):
@@ -90,9 +92,14 @@ class ArchivesScreen(Screen):
 
     def display_simplified_mode(self):
         """Afficher uniquement les noms des archives avec des boutons en mode simplifié, avec filtre."""
-        archive_dir = "archives"
-        if not os.path.exists(archive_dir):
-            print("Le dossier des archives n'existe pas.")
+        script_path = Path(__file__).parent  # Répertoire du script
+        archive_path = script_path / 'archives'  # Chemin complet du dossier "archives"
+
+        # Lister les fichiers .txt dans le dossier "archives"
+        file_list = glob.glob(str(archive_path / '*.txt'))  # Récupère la liste des fichiers .txt
+
+        if not file_list:
+            print("Aucune archive trouvée dans le dossier 'archives'.")
             return
 
         # Liste pour stocker les archives avec leurs informations (date, sport)
@@ -101,23 +108,27 @@ class ArchivesScreen(Screen):
         selected_sport = self.filter_spinner.text.strip().lower()
         print(f"Filtre appliqué : {selected_sport}")
 
-        # On récupère toutes les archives et leur date, avec le sport si disponible
-        for filename in os.listdir(archive_dir):
-            file_path = os.path.join(archive_dir, filename)
-            content = self.read_file_content(file_path)
+        for file_path in file_list:
+            filename = Path(file_path).name  # Récupère le nom du fichier (ex : "match1.txt")
 
-            if content:
-                archive_date = self.extract_date(content)
-                sport_type = self.extract_sport_type(content).lower()
+            # Lecture du contenu du fichier
+            content = self.read_file_content(file_path)  # Assurez-vous que cette méthode lit bien le fichier
+            if not content:
+                print(f"Contenu vide pour {file_path}")
+                continue
 
-                # Appliquer le filtre de sport
-                if selected_sport != 'tout' and sport_type != selected_sport:
-                    continue  # Si le sport ne correspond au filtre, on passe à l'archive suivante
+            # Extraire la date et le type de sport du contenu
+            archive_date = self.extract_date(content)
+            sport_type = self.extract_sport_type(content).lower()
 
-                if archive_date:
-                    archives_with_info.append((filename, file_path, archive_date, sport_type))
+            # Appliquer le filtre de sport
+            if selected_sport != 'tout' and sport_type != selected_sport:
+                continue  # Si le sport ne correspond pas au filtre, on passe à l'archive suivante
 
-        # Si le tri est par date, trier les archives par date, sinon trier par nom d'archive
+            if archive_date:
+                archives_with_info.append((filename, file_path, archive_date, sport_type))
+
+        # Trier les archives par date ou par nom
         sort_by = self.sort_spinner.text
         if sort_by == "Date":
             sorted_archives = sorted(archives_with_info, key=lambda x: x[2], reverse=True)  # Tri par date
@@ -128,19 +139,18 @@ class ArchivesScreen(Screen):
         self.archive_layout.clear_widgets()
 
         for filename, file_path, _, sport_type in sorted_archives:
-            # En mode simplifié, on affiche le nom de l'archive
             archive_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=40)
 
-            # Label avec le nom de l'archive (sans extension)
-            name_without_extension = os.path.splitext(filename)[0]
+            # Nom du fichier sans l'extension
+            name_without_extension = filename.split('.')[0]  # Enlève l'extension .txt
             archive_label = Label(text=name_without_extension, font_size=25, size_hint_x=0.7)
             archive_layout.add_widget(archive_label)
 
-            # Afficher le sport si nécessaire
+            # Affichage du sport
             sport_label = Label(text=f"Sport: {sport_type.capitalize()}", font_size=15, size_hint_x=0.2)
             archive_layout.add_widget(sport_label)
 
-            # Bouton pour ouvrir l'archive
+            # Bouton d'accès à l'archive
             access_button = Button(text="Ouvrir", size_hint_x=0.15)
             access_button.bind(on_release=lambda instance, path=file_path: self.open_archive_popup(path))
             archive_layout.add_widget(access_button)
@@ -149,6 +159,7 @@ class ArchivesScreen(Screen):
 
     def open_archive_popup(self, file_path):
         """Ouvrir une popup pour gérer l'archive."""
+
         # Lire le contenu de l'archive
         content = self.read_file_content(file_path)
         if not content:
@@ -213,7 +224,8 @@ class ArchivesScreen(Screen):
         popup_layout.add_widget(scroll_view)
 
         # **1. Créer d'abord la popup**
-        archive_name = os.path.basename(file_path).replace(".txt", "")
+        archive_path = Path(file_path)
+        archive_name = archive_path.stem  # Nom du fichier sans l'extension
         popup_title = f"Données de l'archive - {archive_name} ({date_archive})"  # Ajout de la date
         popup = Popup(title=popup_title, content=popup_layout, size_hint=(0.9, 0.9))
 
@@ -230,8 +242,8 @@ class ArchivesScreen(Screen):
 
         # Boutons de suppression et d'export
         delete_button.bind(
-            on_release=lambda instance, path=file_path, widget_to_remove=popup_layout: self.delete_archive(path,
-                                                                                                           widget_to_remove)
+            on_release=lambda instance, path=str(archive_path), widget_to_remove=popup_layout:
+            self.delete_archive(path, widget_to_remove)
         )
         export_button.bind(on_release=lambda instance: self.export_to_excel(file_path, player_data))
 
@@ -246,18 +258,27 @@ class ArchivesScreen(Screen):
         try:
             popup.open()
         except Exception as e:
-            print(f"Erreur lors de l'ouverture de la popup : {e}")
+            print(f"❌ Erreur lors de l'ouverture de la popup : {e}")
 
     def export_to_excel(self, file_path, player_data):
         """Exporter les données de l'archive au format Excel."""
-        # Nom du dossier d'exportation
-        export_folder = "archives_excel"
-        if not os.path.exists(export_folder):
-            os.makedirs(export_folder)  # Crée le dossier s'il n'existe pas
+
+        # Détecter le bon chemin de base (Windows, Android, iOS)
+        if platform == 'android':
+            from android.storage import app_storage_path
+            base_path = Path(app_storage_path())
+        elif platform == 'ios':
+            base_path = Path().home() / 'Documents'
+        else:
+            base_path = Path(__file__).parent
+
+        # Nom du dossier d'exportation (il sera créé dans le bon répertoire)
+        export_folder = base_path / "archives_excel"
+        export_folder.mkdir(parents=True, exist_ok=True)  # Crée le dossier s'il n'existe pas
 
         # Nom du fichier Excel basé sur le nom du fichier de l'archive (sans .txt)
-        base_filename = os.path.basename(file_path).replace(".txt", "")
-        excel_path = os.path.join(export_folder, f"{base_filename}.xlsx")
+        base_filename = Path(file_path).stem  # Nom de fichier sans extension
+        excel_path = export_folder / f"{base_filename}.xlsx"
 
         try:
             # Créer le fichier Excel
@@ -283,15 +304,34 @@ class ArchivesScreen(Screen):
             workbook.save(excel_path)
 
             # Ouvrir le fichier Excel après exportation
-            if os.name == 'nt':  # Windows
-                os.startfile(excel_path)
-            elif os.uname().sysname == 'Darwin':  # macOS
+            if platform == 'win':  # Windows
+                subprocess.Popen(["start", excel_path], shell=True)
+            elif platform == 'macosx':  # macOS (iOS est basé sur Darwin mais n'a pas de Popen)
                 subprocess.Popen(["open", excel_path])
-            else:  # Linux
+            elif platform == 'linux':
                 subprocess.Popen(["xdg-open", excel_path])
+            elif platform == 'android':
+                try:
+                    from jnius import autoclass
+                    Intent = autoclass('android.content.Intent')
+                    Uri = autoclass('android.net.Uri')
+                    File = autoclass('java.io.File')
+                    PythonActivity = autoclass('org.kivy.android.PythonActivity')
 
-            # Afficher une popup de confirmation
-            self.show_export_confirmation_popup(excel_path)
+                    file = File(str(excel_path))
+                    uri = Uri.fromFile(file)
+                    intent = Intent()
+                    intent.setAction(Intent.ACTION_VIEW)
+                    intent.setDataAndType(uri, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                    currentActivity = PythonActivity.mActivity
+                    currentActivity.startActivity(intent)
+                except Exception as e:
+                    print(f"Erreur lors de l'ouverture du fichier sur Android : {e}")
+            else:
+                print(f"Plateforme non prise en charge pour l'ouverture automatique du fichier Excel.")
+
+            # Afficher une popup de confirmation (si nécessaire)
+            self.show_export_confirmation_popup(str(excel_path))
 
         except Exception as e:
             print(f"Erreur lors de l'exportation du fichier Excel : {e}")
@@ -312,10 +352,21 @@ class ArchivesScreen(Screen):
     def load_archives(self, *args):
         """Charger et afficher les archives, en appliquant le filtre sport."""
         self.archive_layout.clear_widgets()
-        archive_dir = "archives"
         self.sorted_data = {"Sport": {}, "Joueur": {}, "Variable": {}}
 
-        if not os.path.exists(archive_dir):
+        # Détecter le bon chemin de base (Windows, Android, iOS, etc.)
+        if platform == 'android':
+            from android.storage import app_storage_path
+            base_path = Path(app_storage_path())
+        elif platform == 'ios':
+            base_path = Path().home() / 'Documents'
+        else:
+            base_path = Path(__file__).parent
+
+        # Chemin du dossier des archives
+        archive_dir = base_path / "archives"
+
+        if not archive_dir.exists():
             print("Le dossier des archives n'existe pas.")
             return
 
@@ -323,25 +374,30 @@ class ArchivesScreen(Screen):
         print(f"Chargement des archives avec le filtre sport : {selected_sport}")
 
         archives_with_dates = []
-        for filename in sorted(os.listdir(archive_dir), reverse=True):
-            file_path = os.path.join(archive_dir, filename)
-            content = self.read_file_content(file_path)
 
-            if content is None:
-                continue
+        # Parcourir tous les fichiers du dossier des archives
+        for file_path in sorted(archive_dir.iterdir(), reverse=True):
+            if file_path.is_file() and file_path.suffix == '.txt':  # On ne considère que les fichiers .txt
+                content = self.read_file_content(file_path)
 
-            sport_type = self.extract_sport_type(content).lower()
-            if selected_sport != 'tout' and sport_type != selected_sport:
-                continue
+                if content is None:
+                    continue
 
-            archive_date = self.extract_date(content)
-            if archive_date:
-                archives_with_dates.append((filename, file_path, content, sport_type, archive_date))
-                self.organize_data(filename, content, sport_type)
+                sport_type = self.extract_sport_type(content).lower()
+                if selected_sport != 'tout' and sport_type != selected_sport:
+                    continue
 
+                archive_date = self.extract_date(content)
+                if archive_date:
+                    archives_with_dates.append((file_path.name, file_path, content, sport_type, archive_date))
+                    self.organize_data(file_path.name, content, sport_type)
+
+        # Trier les archives par date décroissante
         sorted_archives_by_date = sorted(archives_with_dates, key=lambda x: x[4], reverse=True)
-        for _, file_path, content, sport_type, _ in sorted_archives_by_date:
-            self.add_archive_to_layout(_, content, file_path, sport_type)
+
+        # Affichage des archives triées
+        for filename, file_path, content, sport_type, _ in sorted_archives_by_date:
+            self.add_archive_to_layout(filename, content, str(file_path), sport_type)
 
     def is_detailed_mode(self):
         """Retourne True si le mode détaillé est activé, sinon False (mode simplifié)."""
@@ -385,13 +441,23 @@ class ArchivesScreen(Screen):
     @staticmethod
     def read_file_content(file_path):
         """Tente de lire le fichier en utilisant plusieurs encodages."""
-        encodings = ['iso-8859-1', 'utf-8' 'latin-1']
+
+        # Assurez-vous que file_path est bien de type Path
+        if not isinstance(file_path, Path):
+            file_path = Path(file_path)
+
+        # Liste des encodages à essayer
+        encodings = ['iso-8859-1', 'utf-8', 'latin-1']  # Attention : il manquait une virgule entre 'utf-8' et 'latin-1'
+
         for enc in encodings:
             try:
-                with open(file_path, 'r', encoding=enc) as f:
+                with file_path.open('r', encoding=enc) as f:  # Utilisation de Path().open() au lieu de open()
                     return f.readlines()
             except UnicodeDecodeError:
                 print(f"Erreur de décodage avec l'encodage {enc} pour le fichier {file_path}")
+            except Exception as e:
+                print(f"Erreur inconnue lors de la lecture du fichier {file_path} : {e}")
+
         print(f"Impossible de lire le fichier {file_path} avec les encodages disponibles.")
         return None
 
@@ -496,49 +562,73 @@ class ArchivesScreen(Screen):
             self.archive_layout.add_widget(table_layout)
 
     def display_default_order(self):
-        # Afficher les archives sans tri (ordre par défaut)
-        archive_dir = "archives"
-        for filename in sorted(os.listdir(archive_dir), reverse=True):
-            file_path = os.path.join(archive_dir, filename)
-            content = self.read_file_content(file_path)
-            if content:
-                sport_type = self.extract_sport_type(content)
-                self.add_archive_to_layout(filename, content, file_path, sport_type)
+        """Afficher les archives sans tri (ordre par défaut)."""
+
+        # Définition du dossier des archives
+        archive_dir = Path("archives")  # Utilisation de Path au lieu de chaîne de caractères
+
+        if not archive_dir.exists():
+            print(f"Le dossier {archive_dir} n'existe pas.")
+            return
+
+        # Tri des fichiers par nom dans l'ordre décroissant
+        for file_path in sorted(archive_dir.iterdir(), key=lambda x: x.name, reverse=True):
+            if file_path.is_file():  # Vérifie que c'est bien un fichier
+                content = self.read_file_content(file_path)
+                if content:
+                    sport_type = self.extract_sport_type(content)
+                    self.add_archive_to_layout(file_path.name, content, file_path, sport_type)
 
     def display_sorted_by_filename(self):
-        # Trier les archives par nom d'archive (alphabétique)
-        archive_dir = "archives"
-        sorted_files = sorted(os.listdir(archive_dir))  # Tri alphabétique
-        for filename in sorted_files:
-            file_path = os.path.join(archive_dir, filename)
-            content = self.read_file_content(file_path)
-            if content:
-                sport_type = self.extract_sport_type(content)
-                self.add_archive_to_layout(filename, content, file_path, sport_type)
+        """Trier les archives par nom d'archive (ordre alphabétique) et les afficher."""
+
+        # Chemin du dossier des archives
+        archive_dir = Path("archives")  # Utilisation de Path au lieu d'une simple chaîne de caractères
+
+        if not archive_dir.exists():
+            print(f"Le dossier {archive_dir} n'existe pas.")
+            return
+
+        # Tri alphabétique des fichiers
+        sorted_files = sorted(archive_dir.iterdir(), key=lambda x: x.name)  # Tri par nom de fichier
+
+        for file_path in sorted_files:
+            if file_path.is_file():  # Vérifie qu'il s'agit bien d'un fichier
+                content = self.read_file_content(file_path)
+                if content:
+                    sport_type = self.extract_sport_type(content)
+                    self.add_archive_to_layout(file_path.name, content, file_path, sport_type)
 
     def display_sorted_by_date(self):
         """Trier les archives par date et afficher les détails de chaque archive."""
-        archive_dir = "archives"
+
+        # Chemin du dossier des archives
+        archive_dir = Path("archives")
         archives_with_dates = []
 
-        for filename in os.listdir(archive_dir):
+        if not archive_dir.exists():
+            print(f"❌ Le dossier {archive_dir} n'existe pas.")
+            return
+
+        # Parcourir tous les fichiers du dossier archives
+        for file_path in archive_dir.iterdir():
             try:
-                file_path = os.path.join(archive_dir, filename)
-                content = self.read_file_content(file_path)
+                if file_path.is_file():  # Vérifie qu'il s'agit bien d'un fichier
+                    content = self.read_file_content(file_path)
 
-                if not content:
-                    print(f"⚠️ Fichier vide ou contenu non lisible : {filename}")
-                    continue
+                    if not content:
+                        print(f"⚠️ Fichier vide ou contenu non lisible : {file_path.name}")
+                        continue
 
-                # Extraction de la date à partir du contenu
-                archive_date = self.extract_date(content)
-                if archive_date:
-                    archives_with_dates.append((filename, file_path, content, archive_date))
-                else:
-                    print(f"⚠️ Date non trouvée ou invalide dans le fichier {filename}")
+                    # Extraction de la date à partir du contenu
+                    archive_date = self.extract_date(content)
+                    if archive_date:
+                        archives_with_dates.append((file_path.name, file_path, content, archive_date))
+                    else:
+                        print(f"⚠️ Date non trouvée ou invalide dans le fichier {file_path.name}")
 
             except Exception as e:
-                print(f"❌ Erreur de lecture ou d'extraction des données de {filename} : {e}")
+                print(f"❌ Erreur de lecture ou d'extraction des données de {file_path.name} : {e}")
 
         # Trier les archives par date (du plus récent au plus ancien)
         try:
@@ -553,7 +643,7 @@ class ArchivesScreen(Screen):
                 # Formater la date pour l'affichage (format : "YYYY-MM-DD HH:MM:SS")
                 formatted_date = archive_date.strftime("%Y-%m-%d %H:%M:%S")
 
-                # Maintenant, ajouter l'archive en utilisant la date formatée
+                # Ajouter l'archive à l'interface
                 self.add_archive_to_layout(filename, content, file_path, formatted_date)
             except Exception as e:
                 print(f"❌ Erreur lors de l'ajout de l'archive {filename} à l'interface : {e}")
@@ -666,31 +756,62 @@ class ArchivesScreen(Screen):
         return "Inconnu"
 
     def open_archive(self, file_path):
-        # Ouvrir le fichier d'archive (afficher son contenu)
-        content = self.read_file_content(file_path)
-        if content:
-            print("\n".join(content))
+        """Ouvrir le fichier d'archive et afficher son contenu."""
+
+        # Convertir le chemin en objet Path
+        archive_path = Path(file_path)
+
+        # Vérifier si le fichier existe et est un fichier
+        if not archive_path.is_file():
+            print(f"❌ Le fichier {archive_path} n'existe pas ou n'est pas un fichier valide.")
+            return
+
+        try:
+            # Lire le contenu du fichier
+            content = self.read_file_content(archive_path)
+            if content:
+                print("\n".join(content))
+            else:
+                print(f"⚠️ Le fichier {archive_path.name} est vide ou le contenu n'a pas pu être lu.")
+        except Exception as e:
+            print(f"❌ Erreur lors de l'ouverture du fichier {archive_path.name} : {e}")
 
     #Bouton effacer
     def delete_archive(self, file_path, widget_to_remove):
+        """Supprimer une archive avec confirmation de l'utilisateur."""
+
         def confirm_deletion(instance):
             try:
-                os.remove(file_path)
-                self.archive_layout.remove_widget(widget_to_remove)
+                archive_path = Path(file_path)
+
+                # Vérifier si le fichier existe avant de le supprimer
+                if archive_path.is_file():
+                    archive_path.unlink()  # Supprime le fichier
+                    self.archive_layout.remove_widget(widget_to_remove)
+                    print(f"✅ Archive supprimée : {archive_path.name}")
+                else:
+                    print(f"❌ Le fichier {archive_path} n'existe pas ou n'est pas un fichier valide.")
+
                 popup.dismiss()
             except Exception as e:
-                print(f"Erreur lors de la suppression de l'archive {file_path} : {e}")
+                print(f"❌ Erreur lors de la suppression de l'archive {archive_path.name} : {e}")
 
+        # Création de la boîte de confirmation
         popup_layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
         label = Label(text="Êtes-vous sûr de vouloir supprimer cette archive ?")
+
+        # Boutons de confirmation et d'annulation
         buttons_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=50)
         confirm_button = Button(text="Oui", on_release=confirm_deletion)
         cancel_button = Button(text="Non", on_release=lambda x: popup.dismiss())
         buttons_layout.add_widget(confirm_button)
         buttons_layout.add_widget(cancel_button)
 
+        # Ajout des widgets à la mise en page de la popup
         popup_layout.add_widget(label)
         popup_layout.add_widget(buttons_layout)
+
+        # Création et ouverture de la popup
         popup = Popup(title="Confirmation de suppression", content=popup_layout, size_hint=(0.8, 0.4))
         popup.open()
 
