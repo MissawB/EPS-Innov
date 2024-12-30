@@ -3,6 +3,10 @@ from kivy.uix.label import Label
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.screenmanager import Screen
 from kivy.uix.gridlayout import GridLayout
+from kivy.config import Config
+Config.set('graphics', 'width', '360')
+Config.set('graphics', 'height', '640')
+from kivy.utils import platform
 
 ################################ Écran d'accueil ##################################################
 class HomeScreen(Screen):
@@ -29,6 +33,19 @@ class HomeScreen(Screen):
 
         layout.add_widget(btn_layout)
         self.add_widget(layout)
+
+    def build(self):
+        # Demander les permissions avant toute action
+        self.ask_permissions()
+        return Label(text="iSport")
+
+    def ask_permissions(self):
+        if platform == 'android':
+            from android.permissions import request_permissions, Permission
+            request_permissions([
+                Permission.READ_EXTERNAL_STORAGE,
+                Permission.WRITE_EXTERNAL_STORAGE
+            ])
 
     def go_to_selection(self, instance):
         self.manager.current = 'selection'

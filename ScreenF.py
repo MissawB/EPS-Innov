@@ -281,8 +281,8 @@ class FeaturesScreen(Screen):
 
         # Bouton d'image pour la configuration
         config_button = Button(
-            background_normal="/Users/bahma/.spyder-py3/EPS'Innov/image/bouton_parametre.png",
-            background_down="/Users/bahma/.spyder-py3/EPS'Innov/image/bouton_parametre.png",
+            background_normal="./image/bouton_parametre.png",
+            background_down="./image/bouton_parametre.png",
             size_hint_x=0.09,
             size_hint_y=None,
             height=50,
