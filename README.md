@@ -71,8 +71,8 @@ Ce projet est ouvert à la contribution et est développé dans le cadre de l'IM
 ### Cloner le dépôt
 
 ```bash
-git clone https://github.com/MissawB/EPS'Innov.git
-cd EPS'Innov
+git clone https://github.com/MissawB/EPS-Innov.git
+cd EPS-Innov
 ```
 
 ##Contact 
