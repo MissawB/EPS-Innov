@@ -36,7 +36,7 @@ class ArchivesScreen(Screen):
             values=['Tout', 'Futsal', 'Duel', 'Basket', 'Personnalisé'],
             size_hint_x=0.3
         )
-        self.filter_spinner.bind(text=self.load_archives)
+        self.filter_spinner.bind(text=self.update_archive_display_mode)
         top_layout.add_widget(self.filter_spinner)
 
         # Spinner pour le critère de tri
@@ -80,7 +80,7 @@ class ArchivesScreen(Screen):
         self.archive_layout.clear_widgets()
         if self.current_mode == "detailed":
             print("Affichage du mode détaillé")  # Debugging
-            self.display_detailed_mode()
+            self.load_archives()
         elif self.current_mode == "simplified":
             print("Affichage du mode simplifié")  # Debugging
             self.display_simplified_mode()
@@ -92,8 +92,20 @@ class ArchivesScreen(Screen):
 
     def display_simplified_mode(self):
         """Afficher uniquement les noms des archives avec des boutons en mode simplifié, avec filtre."""
-        script_path = Path(__file__).parent  # Répertoire du script
-        archive_path = script_path / 'archives'  # Chemin complet du dossier "archives"
+        # Déterminer le chemin du dossier "archives" en fonction de la plateforme
+        if platform == 'android':
+            from android.storage import app_storage_path
+            archive_path = Path(app_storage_path()) / 'archives'
+        elif platform == 'ios':
+            from ios.storage import documents_path
+            archive_path = Path(documents_path()) / 'archives'
+        else:  # PC ou autres plateformes de bureau
+            archive_path = Path(__file__).parent / 'archives'
+
+        # Vérifier si le dossier existe
+        if not archive_path.exists():
+            print(f"Le dossier 'archives' est introuvable : {archive_path}")
+            return
 
         # Lister les fichiers .txt dans le dossier "archives"
         file_list = glob.glob(str(archive_path / '*.txt'))  # Récupère la liste des fichiers .txt
@@ -442,19 +454,35 @@ class ArchivesScreen(Screen):
     def read_file_content(file_path):
         """Tente de lire le fichier en utilisant plusieurs encodages."""
 
-        # Assurez-vous que file_path est bien de type Path
+        # Gestion des chemins multiplateformes
+        if platform == 'android':
+            from android.storage import app_storage_path
+            base_path = Path(app_storage_path())
+        elif platform == 'ios':
+            from ios.storage import documents_path
+            base_path = Path(documents_path())
+        else:  # PC ou autres plateformes
+            base_path = Path(__file__).parent
+
+        # Convertir en type Path et gérer les chemins relatifs
         if not isinstance(file_path, Path):
             file_path = Path(file_path)
+        if not file_path.is_absolute():
+            file_path = base_path / file_path
 
         # Liste des encodages à essayer
-        encodings = ['iso-8859-1', 'utf-8', 'latin-1']  # Attention : il manquait une virgule entre 'utf-8' et 'latin-1'
+        encodings = ['iso-8859-1', 'utf-8', 'latin-1']
 
         for enc in encodings:
             try:
-                with file_path.open('r', encoding=enc) as f:  # Utilisation de Path().open() au lieu de open()
+                # Lecture du fichier avec gestion des encodages
+                with file_path.open('r', encoding=enc) as f:
                     return f.readlines()
             except UnicodeDecodeError:
                 print(f"Erreur de décodage avec l'encodage {enc} pour le fichier {file_path}")
+            except FileNotFoundError:
+                print(f"Fichier introuvable : {file_path}")
+                break  # Pas besoin de continuer si le fichier n'existe pas
             except Exception as e:
                 print(f"Erreur inconnue lors de la lecture du fichier {file_path} : {e}")
 
@@ -499,7 +527,18 @@ class ArchivesScreen(Screen):
         sort_by = self.sort_spinner.text
 
         if self.current_mode == "simplified":
-            self.display_simplified_mode()
+            if sort_by == "Nom d'archive":
+                self.display_sorted_by_filename()
+            elif sort_by == "Date":
+                self.display_sorted_by_date()
+            elif sort_by == "Sport":
+                self.display_sorted_data('Sport')
+            elif sort_by == "Joueur":
+                self.display_sorted_data('Joueur')
+            elif sort_by == "Variable":
+                self.display_sorted_by_variable()
+            else:
+                self.display_simplified_mode()
         else:
             if sort_by == "Nom d'archive":
                 self.display_sorted_by_filename()
@@ -748,7 +787,7 @@ class ArchivesScreen(Screen):
                 self.archive_layout.add_widget(table_layout)
 
     def get_sport_for_player(self, player_name):
-        """ Trouver le sport pour un joueur donné """
+        """Trouver le sport pour un joueur donné."""
         for sport, players in self.sorted_data["Sport"].items():
             for player, _ in players:
                 if player == player_name:
@@ -758,10 +797,10 @@ class ArchivesScreen(Screen):
     def open_archive(self, file_path):
         """Ouvrir le fichier d'archive et afficher son contenu."""
 
-        # Convertir le chemin en objet Path
-        archive_path = Path(file_path)
+        # Gestion multiplateforme pour le chemin d'accès
+        archive_path = self.get_platform_specific_path(file_path)
 
-        # Vérifier si le fichier existe et est un fichier
+        # Vérifier si le fichier existe et est valide
         if not archive_path.is_file():
             print(f"❌ Le fichier {archive_path} n'existe pas ou n'est pas un fichier valide.")
             return
@@ -776,13 +815,13 @@ class ArchivesScreen(Screen):
         except Exception as e:
             print(f"❌ Erreur lors de l'ouverture du fichier {archive_path.name} : {e}")
 
-    #Bouton effacer
     def delete_archive(self, file_path, widget_to_remove):
         """Supprimer une archive avec confirmation de l'utilisateur."""
 
+        # Fonction interne pour confirmer la suppression
         def confirm_deletion(instance):
             try:
-                archive_path = Path(file_path)
+                archive_path = self.get_platform_specific_path(file_path)
 
                 # Vérifier si le fichier existe avant de le supprimer
                 if archive_path.is_file():

@@ -51,15 +51,12 @@ class FeaturesScreen(Screen):
         main_scroll_content = BoxLayout(orientation='vertical', size_hint_y=None)
         main_scroll_content.bind(minimum_height=main_scroll_content.setter('height'))
 
-        # Spinner pour le nombre de joueurs
-        self.num_players_spinner = Spinner(text="3", values=[str(i) for i in range(1,11)], size_hint=(1, None), height=50)
-        self.num_players_spinner.bind(text=self.update_num_players)
-        main_scroll_content.add_widget(self.num_players_spinner)
-
+        # Layout qui affichera la liste des joueurs
         self.players_layout = GridLayout(cols=1, padding=20, spacing=10, size_hint_y=None)
         self.players_layout.bind(minimum_height=self.players_layout.setter('height'))
         main_scroll_content.add_widget(self.players_layout)
 
+        # Bouton pour démarrer le timer
         self.start_timer_button = Button(text="Démarrer le Timer", size_hint=(1, None), height=50)
         self.start_timer_button.bind(on_release=self.start_timer)
         main_scroll_content.add_widget(self.start_timer_button)
@@ -79,12 +76,11 @@ class FeaturesScreen(Screen):
         self.show_init_popup()
 
     def show_init_popup(self):
-        # Fonction appelée pour mettre à jour les champs des noms en fonction du nombre de joueurs
+        # Popup de configuration initiale des joueurs (seul endroit où les noms peuvent être modifiés)
         def update_name_fields(num_players):
             players_layout.clear_widgets()  # Effacer les champs existants
             name_inputs.clear()  # Réinitialiser la liste des champs
 
-            # Ajouter le bon nombre de champs pour les noms des joueurs
             for i in range(num_players):
                 name_input = TextInput(
                     hint_text=f"Nom du Joueur {i + 1}",
@@ -100,41 +96,34 @@ class FeaturesScreen(Screen):
                 name_inputs.append(name_input)
                 players_layout.add_widget(name_input)
 
-        # Fonction pour gérer l'incrémentation/décrémentation du nombre de joueurs
         def change_num_players(change):
             nonlocal num_players
             num_players = max(1, min(20, num_players + change))  # Limiter entre 1 et 20 joueurs
             num_players_label.text = f"Nombre de joueurs : {num_players}"
             update_name_fields(num_players)
 
-        # Fonction appelée lors de la validation de la popup
         def on_confirm(instance):
-            # Mettre à jour les noms et les données des joueurs
+            # Met à jour les noms et les données des joueurs
             self.player_names = [name_inputs[i].text.strip() for i in range(num_players)]
             self.players_data = {
                 self.player_names[i]: {
                     'observables': {},
-                    'num_observables': 3,
-                    'dependencies': {}
+                    'num_observables': 3  # Initialisation avec 3 variables
                 }
                 for i in range(num_players)
             }
 
-            # Mettre à jour l'affichage principal
+            # Mise à jour de l'affichage principal (les Labels afficheront le nom des joueurs)
             self.update_num_players(None, str(num_players))
+
             popup.dismiss()
+            Clock.schedule_once(lambda dt: self.show_variable_setup_popup(), 0.2)
 
-        # Initialisation du nombre de joueurs
         num_players = 3
-
-        # Conteneur principal pour la popup
         popup_layout = BoxLayout(orientation='vertical', spacing=10, padding=(20, 10))
-
-        # Titre
         popup_layout.add_widget(
             Label(text="Choisissez le nombre de joueurs", font_size=18, size_hint_y=None, height=40))
 
-        # Section pour ajuster le nombre de joueurs
         player_count_section = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height=50)
         decrease_btn = Button(text="-", size_hint=(0.2, 1))
         decrease_btn.bind(on_release=lambda instance: change_num_players(-1))
@@ -146,83 +135,63 @@ class FeaturesScreen(Screen):
         player_count_section.add_widget(increase_btn)
         popup_layout.add_widget(player_count_section)
 
-        # Zone pour les champs de texte des noms des joueurs, avec ScrollView
-        scroll_view = ScrollView(size_hint=(1, 0.7))  # Limiter la hauteur à 70% de la popup
+        scroll_view = ScrollView(size_hint=(1, 0.7))
         players_layout = GridLayout(cols=1, spacing=10, size_hint_y=None)
         players_layout.bind(minimum_height=players_layout.setter('height'))
-
-        # Initialisation des champs pour 3 joueurs par défaut
         name_inputs = []
         update_name_fields(num_players)
         scroll_view.add_widget(players_layout)
         popup_layout.add_widget(scroll_view)
 
-        # Boutons pour valider ou annuler
         button_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height=50)
-
         confirm_button = Button(text="Valider", size_hint=(0.5, 1))
         confirm_button.bind(on_release=on_confirm)
         button_layout.add_widget(confirm_button)
-
         cancel_button = Button(text="Annuler", size_hint=(0.5, 1))
         cancel_button.bind(on_release=lambda instance: popup.dismiss())
         button_layout.add_widget(cancel_button)
-
         popup_layout.add_widget(button_layout)
 
-        # Création de la popup
         popup = Popup(
             title="Configuration Initiale",
             content=popup_layout,
-            size_hint=(0.8, 0.9),  # Ajuster pour une taille agréable
+            size_hint=(0.8, 0.9),
             auto_dismiss=False
         )
-
-        # Afficher la popup
         popup.open()
 
-    def on_name_change(self, instance, value):
-        # Met à jour le nom du joueur dans players_data
-        for player in list(self.players_data.keys()):
-            if instance.text != player:
-                if instance.text.strip() not in self.players_data:
-                    self.players_data[instance.text.strip()] = self.players_data.pop(player)
-                break
-
     def update_num_players(self, instance, num_players_text):
+        """ Met à jour l'affichage de la liste des joueurs sans écraser les données déjà enregistrées. """
         try:
             num_players = int(num_players_text)
-        except (ValueError, IndexError):
+        except (ValueError, TypeError):
             num_players = 3
 
-        # Assurez-vous que self.players_data utilise les bons noms
-        self.players_data = {
-            self.player_names[i] if i < len(self.player_names) else f'Joueur {i + 1}': {
-                'observables': {},
-                'num_observables': 3,
-                'dependencies': {}
-            }
-            for i in range(num_players)
-        }
+        # Pour chaque joueur (en gardant les anciens si existants)
+        new_players_data = {}
+        for i in range(num_players):
+            # On récupère le nom existant ou on utilise celui de self.player_names si défini
+            if i < len(self.player_names):
+                player_name = self.player_names[i]
+            else:
+                player_name = f'Joueur {i + 1}'
+            # Si le joueur existe déjà dans players_data, on le garde (ce qui conserve par exemple les observables)
+            if player_name in self.players_data:
+                new_players_data[player_name] = self.players_data[player_name]
+            else:
+                new_players_data[player_name] = {
+                    'observables': {},
+                    'num_observables': 3,
+                }
+        self.players_data = new_players_data
 
         self.players_layout.clear_widgets()
-
-        for i, player in enumerate(self.players_data.keys()):
-            # Layout principal pour afficher uniquement les noms
+        for player in self.players_data.keys():
             player_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=60, padding=(5, 5))
+            # Affichage du nom du joueur en Label (non éditable ici)
+            name_label = Label(text=player, font_size=21, size_hint_x=0.7)
+            player_layout.add_widget(name_label)
 
-            # Champ pour le nom
-            name_input = TextInput(
-                text=player,
-                font_size=21,
-                size_hint_x=0.7
-            )
-            name_input.bind(
-                text=lambda instance, p=player: self.on_name_change(p, instance.text)
-            )
-            player_layout.add_widget(name_input)
-
-            # Bouton pour ouvrir la configuration dans une popup
             config_button = Button(
                 text="Variables",
                 size_hint_x=0.3,
@@ -233,53 +202,160 @@ class FeaturesScreen(Screen):
 
             self.players_layout.add_widget(player_layout)
 
+    def show_variable_setup_popup(self):
+        self.use_same_variables = True  # Par défaut, même nom pour tous les joueurs
+
+        # Assurez-vous que chaque joueur a bien ses observables initialisées
+        self.initialize_observables()
+
+        layout = BoxLayout(orientation='vertical', spacing=10, padding=10)
+        layout.add_widget(Label(text="Configuration des Variables", size_hint_y=None, height=40, font_size=18))
+
+        self.mode_button = Button(text="Utiliser des noms identiques pour tous les joueurs",
+                                  size_hint_y=None, height=40)
+        self.mode_button.bind(on_release=self.toggle_variable_mode)
+        layout.add_widget(self.mode_button)
+
+        var_count_section = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=None, height=50)
+        decrease_btn = Button(text="-", size_hint=(0.2, 1))
+        decrease_btn.bind(on_release=lambda instance: self.change_num_variables(-1))
+        increase_btn = Button(text="+", size_hint=(0.2, 1))
+        increase_btn.bind(on_release=lambda instance: self.change_num_variables(1))
+        self.num_variables_label = Label(
+            text=f"Nombre de variables : {self.players_data[next(iter(self.players_data))]['num_observables']}",
+            size_hint=(0.6, 1))
+        var_count_section.add_widget(decrease_btn)
+        var_count_section.add_widget(self.num_variables_label)
+        var_count_section.add_widget(increase_btn)
+        layout.add_widget(var_count_section)
+
+        scroll_view = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=10)
+        self.variables_layout = BoxLayout(orientation='vertical', spacing=10, padding=10, size_hint_y=None)
+        self.variables_layout.bind(minimum_height=self.variables_layout.setter('height'))
+        scroll_view.add_widget(self.variables_layout)
+        layout.add_widget(scroll_view)
+
+        self.update_variable_inputs()
+
+        confirm_button = Button(text="Valider", size_hint_y=None, height=40)
+        confirm_button.bind(on_release=self.on_variable_setup_confirm)
+        layout.add_widget(confirm_button)
+
+        self.popup = Popup(title="Configuration des Variables", content=layout, size_hint=(0.8, 0.8))
+        self.popup.open()
+
+    def on_variable_setup_confirm(self, instance):
+        if self.use_same_variables:
+            num_vars = max(player['num_observables'] for player in self.players_data.values())
+            for j in range(1, num_vars + 1):
+                var_input = self.variable_inputs[f'Var_{j}']
+                var_name = var_input.text.strip()
+                for player in self.players_data:
+                    key = f'Var {j}'
+                    if key in self.players_data[player]['observables']:
+                        self.players_data[player]['observables'][key]['name'] = var_name or key
+                        self.players_data[player]['observables'][key]['name_label'].text = var_name or key
+        else:
+            for player in self.players_data:
+                for j in range(1, self.players_data[player]['num_observables'] + 1):
+                    var_input = self.variable_inputs[f'{player}_Var_{j}']
+                    var_name = var_input.text.strip()
+                    key = f'Var {j}'
+                    if key in self.players_data[player]['observables']:
+                        self.players_data[player]['observables'][key]['name'] = var_name or key
+                        self.players_data[player]['observables'][key]['name_label'].text = var_name or key
+
+        self.refresh_all_observables()
+        self.popup.dismiss()
+
+    def refresh_all_observables(self):
+        for player in self.players_data:
+            if 'layout' in self.players_data[player]:
+                self.update_observables_layout(player)
+
+    def change_num_variables(self, delta):
+        current_num = self.players_data[next(iter(self.players_data))]['num_observables']
+        new_num = max(1, current_num + delta)
+        for player in self.players_data.keys():
+            self.players_data[player]['num_observables'] = new_num
+            # Pour chaque variable, si elle n'existe pas, on la crée
+            for j in range(1, new_num + 1):
+                key = f'Var {j}'
+                if key not in self.players_data[player]['observables']:
+                    self.players_data[player]['observables'][key] = {
+                        'score': 0,
+                        'initial': 0,
+                        'coefficient': 1,
+                        'point': 0,
+                        'name': key,  # Nom par défaut
+                        'name_label': Label(text=key),
+                        'score_label': Label(text="0")
+                    }
+            # On supprime les variables en trop, le cas échéant
+            keys_to_remove = [k for k in self.players_data[player]['observables'] if int(k.split()[-1]) > new_num]
+            for k in keys_to_remove:
+                del self.players_data[player]['observables'][k]
+        self.num_variables_label.text = f"Nombre de variables : {new_num}"
+        self.update_variable_inputs()
+
+    def toggle_variable_mode(self, instance):
+        self.use_same_variables = not self.use_same_variables
+        if self.use_same_variables:
+            self.mode_button.text = "Utiliser des noms identiques pour tous les joueurs"
+        else:
+            self.mode_button.text = "Utiliser des noms différents pour chaque joueur"
+        self.update_variable_inputs()
+
+    def update_variable_inputs(self):
+        """ Met à jour les champs de saisie dans la popup de variables
+            en préremplissant avec le nom actuellement enregistré.
+        """
+        self.variables_layout.clear_widgets()
+        self.variable_inputs = {}
+
+        if self.use_same_variables:
+            ref_player = next(iter(self.players_data))
+            num_vars = self.players_data[ref_player]['num_observables']
+            for i in range(1, num_vars + 1):
+                key = f"Var {i}"
+                current_name = self.players_data[ref_player]['observables'].get(key, {}).get("name", key)
+                var_input = TextInput(text=current_name, size_hint_y=None, height=40)
+                self.variable_inputs[f'Var_{i}'] = var_input
+                self.variables_layout.add_widget(var_input)
+        else:
+            for player in self.players_data:
+                player_label = Label(text=f"Variables pour {player}:", size_hint_y=None, height=30)
+                self.variables_layout.add_widget(player_label)
+                num_vars = self.players_data[player]['num_observables']
+                for i in range(1, num_vars + 1):
+                    key = f"Var {i}"
+                    current_name = self.players_data[player]['observables'].get(key, {}).get("name", key)
+                    var_input = TextInput(text=current_name, size_hint_y=None, height=40)
+                    self.variable_inputs[f'{player}_Var_{i}'] = var_input
+                    self.variables_layout.add_widget(var_input)
+
     def show_player_var_popup(self, player):
-        # Si une popup est déjà ouverte, la fermer avant d'en créer une nouvelle
+        """ Affiche la popup de configuration des variables pour un joueur donné.
+            Dans cette popup, le nom du joueur est affiché en Label (non modifiable ici).
+        """
         if hasattr(self, 'popup') and self.popup:
             self.popup.dismiss()
             self.popup = None
 
-        # Nettoyer le layout existant dans players_data pour éviter les conflits
         if 'layout' in self.players_data[player]:
             old_layout = self.players_data[player].pop('layout', None)
             if old_layout:
                 old_layout.clear_widgets()
 
-        # Conteneur principal
         content = BoxLayout(orientation='vertical', spacing=10, padding=(20, 10))
-
-        # Zone principale pour le joueur
         main_player_layout = BoxLayout(orientation='vertical', spacing=10, size_hint_y=None)
         main_player_layout.bind(minimum_height=main_player_layout.setter('height'))
 
-        # Ligne d'informations avec le TextInput, le Spinner et le bouton d'image
         info_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=50, spacing=10)
+        # Affichage du nom du joueur en Label (modification uniquement via la popup initiale)
+        name_label = Label(text=player, font_size=16, size_hint_x=0.5)
+        info_layout.add_widget(name_label)
 
-        # Champ de texte pour le nom
-        name_input = TextInput(
-            text=player,
-            font_size=16,
-            size_hint_x=0.5,
-            multiline=False,
-            hint_text="Nom du joueur"
-        )
-        name_input.bind(text=self.on_name_change)
-        info_layout.add_widget(name_input)
-
-        # Spinner pour le nombre d'observables
-        spinner = Spinner(
-            text=str(self.players_data[player].get('num_observables', 3)),  # Par défaut, 3 observables
-            values=[str(i) for i in range(1, 6)],
-            size_hint_x=0.2,
-            size_hint_y=None,
-            height=50
-        )
-        spinner.bind(
-            text=lambda instance, val, p=player: self.set_num_observables(p, int(val))
-        )
-        info_layout.add_widget(spinner)
-
-        # Bouton d'image pour la configuration
         config_button = Button(
             background_normal="./image/bouton_parametre.png",
             background_down="./image/bouton_parametre.png",
@@ -291,61 +367,53 @@ class FeaturesScreen(Screen):
         config_button.bind(on_release=lambda instance, p=player: self.show_player_config_popup(p))
         info_layout.add_widget(config_button)
 
-        # Ajouter le layout des informations au layout principal
         main_player_layout.add_widget(info_layout)
 
-        # Grille pour les variables du joueur
         variables_layout = GridLayout(
-            cols=4,  # 4 colonnes
+            cols=4,
             spacing=10,
             padding=10,
             size_hint_y=None,
             height=150
         )
         self.players_data[player]['layout'] = variables_layout
-
-        # Mise à jour de la disposition des observables
         self.update_observables_layout(player)
-
-        # Ajouter le layout des variables
         main_player_layout.add_widget(variables_layout)
 
-        # Ajout du layout principal des joueurs à la popup
         scroll_view = ScrollView(size_hint=(1, 0.8))
         scroll_view.add_widget(main_player_layout)
         content.add_widget(scroll_view)
 
-        # Bouton pour fermer la popup
-        close_button = Button(
-            text="Fermer",
-            size_hint_y=None,
-            height=50
-        )
+        close_button = Button(text="Fermer", size_hint_y=None, height=50)
         close_button.bind(on_release=self.close_popup)
         content.add_widget(close_button)
 
-        # Création et affichage de la popup
-        self.popup = Popup(
-            title=f"Paramètres de {player}",
-            content=content,
-            size_hint=(0.9, 0.9),
-            auto_dismiss=False
-        )
+        self.popup = Popup(title=f"Paramètres de {player}", content=content, size_hint=(0.9, 0.9), auto_dismiss=False)
         self.popup.bind(on_dismiss=self.cleanup_popup)
         self.popup.open()
 
     def close_popup(self, instance):
-        """Ferme la popup."""
         if hasattr(self, 'popup') and self.popup:
             self.popup.dismiss()
 
     def cleanup_popup(self, instance):
-        """Nettoie après fermeture."""
         self.popup = None
 
-    def set_num_observables(self, player, num_observables):
-        self.players_data[player]['num_observables'] = num_observables
-        self.update_observables_layout(player)
+    def initialize_observables(self):
+        for player in self.players_data:
+            num_vars = self.players_data[player].get('num_observables', 3)
+            for i in range(1, num_vars + 1):
+                key = f"Var {i}"
+                if key not in self.players_data[player]['observables']:
+                    self.players_data[player]['observables'][key] = {
+                        'score': 0,
+                        'initial': 0,
+                        'coefficient': 1,
+                        'point': 0,
+                        'name': key,  # Nom par défaut
+                        'name_label': Label(text=key),
+                        'score_label': Label(text="0")
+                    }
 
     def update_observables_layout(self, player):
         layout = self.players_data[player]['layout']
@@ -355,36 +423,38 @@ class FeaturesScreen(Screen):
         layout.height = num_observables * 50
 
         for i in range(num_observables):
-            obs_name = f'Var {i + 1}'
-            if obs_name not in self.players_data[player]['observables']:
-                self.players_data[player]['observables'][obs_name] = {
+            key = f'Var {i + 1}'
+            if key not in self.players_data[player]['observables']:
+                self.players_data[player]['observables'][key] = {
                     'score': 0,
-                    'initial': 0,  # Valeur initiale par défaut
-                    'coefficient': 1,  # Coefficient par défaut
+                    'initial': 0,
+                    'coefficient': 1,
                     'point': 0,
-                    'name_input': TextInput(text=obs_name, font_size=14, size_hint_x=0.5, height=30),
-                    'score_label': Label(text="0", font_size=14, size_hint_x=0.2, height=30),
+                    'name': key,  # Nom par défaut
+                    'name_label': Label(text=key),
+                    'score_label': Label(text="0")
                 }
+            observable_data = self.players_data[player]['observables'][key]
+            chosen_name = observable_data.get('name', key)
+            observable_data['name_label'].text = chosen_name
 
-            observable_data = self.players_data[player]['observables'][obs_name]
-            name_input = observable_data['name_input']
             score_label = observable_data['score_label']
-
-            # Mise à jour de l'affichage du score avec la valeur initiale
             score_label.text = str(observable_data['score'])
 
-            # Boutons pour augmenter/diminuer le score
             btn_increase = Button(text="+", size_hint=(0.1, 0.5), height=30)
-            btn_increase.bind(on_press=lambda x, p=player, o=obs_name: self.update_score(p, o, 1))
+            btn_increase.bind(on_press=lambda x, p=player, o=key: self.update_score(p, o, 1))
 
             btn_decrease = Button(text="-", size_hint=(0.1, 0.5), height=30)
-            btn_decrease.bind(on_press=lambda x, p=player, o=obs_name: self.update_score(p, o, -1))
+            btn_decrease.bind(on_press=lambda x, p=player, o=key: self.update_score(p, o, -1))
 
-            # Ajouter les widgets à la grille
-            layout.add_widget(name_input)
+            layout.add_widget(observable_data['name_label'])
             layout.add_widget(score_label)
             layout.add_widget(btn_increase)
             layout.add_widget(btn_decrease)
+
+    def set_num_observables(self, player, num_observables):
+        self.players_data[player]['num_observables'] = num_observables
+        self.update_observables_layout(player)
 
     def initialize_observable(self, player, observable, initial_value=0, coefficient=1, dependency=None,
                               dependency_mode="Somme"):
@@ -402,13 +472,21 @@ class FeaturesScreen(Screen):
         Affiche un popup permettant de configurer les variables d'un joueur, notamment leur valeur initiale,
         leur coefficient, et leurs dépendances.
         """
+        # On construit un dictionnaire pour associer le nom personnalisé à la clé de l'observable.
+        variable_mapping = {}
+        for key, data in self.players_data[player]['observables'].items():
+            # Utilise le nom enregistré dans "name" s'il existe, sinon la clé par défaut.
+            variable_mapping[data.get('name', key)] = key
+
+        spinner_values = list(variable_mapping.keys())
+
         # Création du layout principal du popup
         layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
 
         # Spinner pour sélectionner une variable à configurer
         variable_spinner = Spinner(
             text="Sélectionnez une variable",
-            values=list(self.players_data[player]['observables'].keys()),
+            values=spinner_values,
             size_hint=(1, None),
             height=50
         )
@@ -431,10 +509,40 @@ class FeaturesScreen(Screen):
 
         # Bouton pour appliquer les modifications
         apply_button = Button(text="Appliquer", size_hint=(1, None), height=40)
+
+        # Exemple de callback d'application (adapté à vos besoins) :
+        def apply_changes(instance):
+            # Récupère le nom affiché sélectionné dans le spinner
+            selected_name = variable_spinner.text
+            # Récupère la clé correspondante à partir de notre mapping
+            selected_key = variable_mapping.get(selected_name)
+            if selected_key:
+                # Par exemple, mettre à jour la valeur initiale et le coefficient pour l'observable sélectionnée
+                try:
+                    initial_value = int(initial_value_input.text.strip())
+                except ValueError:
+                    initial_value = 0
+                try:
+                    coefficient = int(coefficient_input.text.strip())
+                except ValueError:
+                    coefficient = 1
+
+                # Mise à jour de l'observable pour ce joueur
+                obs = self.players_data[player]['observables'][selected_key]
+                obs['initial'] = initial_value
+                obs['coefficient'] = coefficient
+                obs['score'] = initial_value  # Réinitialisation du score si nécessaire
+                obs['score_label'].text = str(initial_value)
+                # Vous pouvez ajouter ici d'autres mises à jour ou appeler une méthode de rafraîchissement
+
+            popup.dismiss()
+
+        apply_button.bind(on_release=apply_changes)
         layout.add_widget(apply_button)
 
-        # Création du popup
+        # Création et affichage du popup
         popup = Popup(title=f"Configuration du joueur {player}", content=layout, size_hint=(0.8, 0.9))
+        popup.open()
 
         def update_fields(spinner, text):
             """Mise à jour des champs lorsque l'utilisateur change de variable."""
@@ -487,8 +595,15 @@ class FeaturesScreen(Screen):
         observables d'un joueur sous forme de tableau avec des indications sur les axes.
         """
         try:
-            # Récupérer les variables observables du joueur
-            variables = list(self.players_data[player]['observables'].keys())
+            # Construire un mapping : nom personnalisé -> clé d'observable
+            variable_mapping = {}
+            for key, obs in self.players_data[player]['observables'].items():
+                # Utilise le nom enregistré (ou la clé par défaut)
+                var_name = obs.get('name', key)
+                variable_mapping[var_name] = key
+
+            # Liste des noms personnalisés
+            variable_names = list(variable_mapping.keys())
 
             # Layout principal du popup
             layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
@@ -499,35 +614,38 @@ class FeaturesScreen(Screen):
             layout.add_widget(axes_layout)
 
             # Layout pour le tableau des dépendances
-            table_layout = GridLayout(cols=len(variables) + 1, size_hint_y=None)
-            table_layout.height = 40 * (len(variables) + 1)  # Une ligne pour les noms + chaque variable
+            num_vars = len(variable_names)
+            table_layout = GridLayout(cols=num_vars + 1, size_hint_y=None)
+            table_layout.height = 40 * (num_vars + 1)  # Une ligne pour les titres + une ligne par variable
             table_layout.spacing = 5
 
-            # Ajouter la première ligne avec les noms des colonnes
-            table_layout.add_widget(Label(text=" ", size_hint_x=None, width=150))  # Coin vide
-            for var in variables:
+            # Première ligne : étiquette vide en première cellule
+            table_layout.add_widget(Label(text=" ", size_hint_x=None, width=150))
+            for var in variable_names:
                 table_layout.add_widget(Label(text=f"{var} (Base)", size_hint_x=None, width=100))
 
-            # Ajouter une ligne pour chaque variable
-            dependency_spinners = {}  # Dictionnaire pour garder une trace des spinners
-            for base_var in variables:
-                # Ajouter l'étiquette de la ligne
-                table_layout.add_widget(Label(text=f"{base_var} (Dépendante)", size_hint_x=None, width=150))
+            dependency_spinners = {}  # Pour garder une trace des spinners
 
-                for dependent_var in variables:
+            # Pour chaque variable en ligne (dépendante)
+            for base_var in variable_names:
+                # Première colonne : le nom de la variable dépendante
+                table_layout.add_widget(Label(text=f"{base_var} (Dépendante)", size_hint_x=None, width=150))
+                # Pour chaque variable en colonne (base)
+                for dependent_var in variable_names:
                     if base_var == dependent_var:
-                        # Ajouter une cellule vide si la variable est la même
                         table_layout.add_widget(Label(text="-", size_hint_x=None, width=100))
                     else:
-                        # Déterminer le mode actuel de la dépendance
-                        dependencies = self.players_data[player]['observables'][base_var].get('dependent_on', [])
+                        # Récupérer le mode actuel de la dépendance depuis les données,
+                        # en recherchant dans l'attribut 'dependent_on' de l'observable correspondant à base_var.
+                        base_key = variable_mapping[base_var]
+                        dependencies = self.players_data[player]['observables'][base_key].get('dependent_on', [])
                         current_mode = "Aucune"
                         for dep in dependencies:
-                            if dep['var'] == dependent_var:
+                            # Comparaison sur les clés
+                            if dep['var'] == variable_mapping[dependent_var]:
                                 current_mode = dep.get('mode', "Aucune")
                                 break
 
-                        # Ajouter un spinner pour configurer la dépendance
                         spinner = Spinner(
                             text=current_mode,
                             values=["Aucune", "Somme", "Produit", "Pourcentage"],
@@ -535,6 +653,7 @@ class FeaturesScreen(Screen):
                             width=100
                         )
                         table_layout.add_widget(spinner)
+                        # Enregistrer dans le dictionnaire avec la paire (base_var, dependent_var)
                         dependency_spinners[(base_var, dependent_var)] = spinner
 
             # Scroller pour gérer le tableau si trop grand
@@ -551,25 +670,26 @@ class FeaturesScreen(Screen):
                 """
                 for (base_var, dependent_var), spinner in dependency_spinners.items():
                     mode = spinner.text
+                    # Récupérer les clés d'observable correspondantes
+                    base_key = variable_mapping[base_var]
+                    dependent_key = variable_mapping[dependent_var]
                     if mode == "Aucune":
                         # Supprimer la dépendance si le mode est "Aucune"
-                        self.players_data[player]['observables'][base_var]['dependent_on'] = [
-                            dep for dep in self.players_data[player]['observables'][base_var].get('dependent_on', [])
-                            if dep['var'] != dependent_var
+                        self.players_data[player]['observables'][base_key]['dependent_on'] = [
+                            dep for dep in self.players_data[player]['observables'][base_key].get('dependent_on', [])
+                            if dep['var'] != dependent_key
                         ]
                     else:
                         # Ajouter ou mettre à jour la dépendance
-                        dependencies = self.players_data[player]['observables'][base_var].setdefault('dependent_on', [])
+                        dependencies = self.players_data[player]['observables'][base_key].setdefault('dependent_on', [])
                         for dep in dependencies:
-                            if dep['var'] == dependent_var:
-                                dep['mode'] = mode  # Mettre à jour le mode existant
+                            if dep['var'] == dependent_key:
+                                dep['mode'] = mode  # Met à jour le mode existant
                                 break
                         else:
-                            # Ajouter une nouvelle dépendance si elle n'existe pas
-                            dependencies.append({'var': dependent_var, 'mode': mode})
-
-                        print(
-                            f"Added/Updated dependency: {dependent_var} depends on {base_var} with mode {mode}")  # Log
+                            # Ajouter une nouvelle dépendance
+                            dependencies.append({'var': dependent_key, 'mode': mode})
+                        print(f"Added/Updated dependency: {dependent_key} depends on {base_key} with mode {mode}")
 
                 self.update_observables_layout(player)
                 popup.dismiss()
