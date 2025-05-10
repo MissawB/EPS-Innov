@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basket-ball vs Water-polo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background: #f4f4f9;
+        }
+        header {
+            background: #2c3e50;
+            color: #fff;
+            padding: 20px 0;
+            text-align: center;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #fff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .flex-container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .flex-item {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 8px;
+        }
+        .pros-cons {
+            margin-top: 20px;
+        }
+        ul {
+            list-style-type: square;
+            margin: 0;
+            padding: 0;
+        }
+        ul li {
+            margin: 10px 0;
+        }
+        footer {
+            text-align: center;
+            background: #2c3e50;
+            color: #fff;
+            padding: 10px 0;
+            margin-top: 20px;
+        }
+        nav {
+            text-align: center;
+            margin: 20px 0;
+        }
+        select {
+            padding: 10px;
+            font-size: 16px;
+        }
+        .poll {
+            margin-top: 20px;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 8px;
+        }
+        .poll label {
+            display: block;
+            margin: 10px 0;
+        }
+        .poll button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #2c3e50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .poll button:hover {
+            background: #34495e;
+        }
+    </style>
+    <script>
+        function navigateToSport() {
+            const sport = document.getElementById('sport-select').value;
+            if (sport === 'basketball') {
+                window.open('https://fr.wikipedia.org/wiki/Basket-ball', '_blank');
+            } else if (sport === 'waterpolo') {
+                window.open('https://fr.wikipedia.org/wiki/Water-polo', '_blank');
+            }
+        }
+        function submitPoll() {
+            alert('Merci pour votre vote !');
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <h1>Basket-ball vs Water-polo</h1>
+        <p>Lequel est le meilleur sport ? Découvrez les arguments pour et contre !</p>
+    </header>
+    <nav>
+        <select id="sport-select" onchange="navigateToSport()">
+            <option value="">-- Choisissez un sport --</option>
+            <option value="basketball">Basket-ball</option>
+            <option value="waterpolo">Water-polo</option>
+        </select>
+    </nav>
+    <div class="container">
+        <div class="flex-container">
+            <div class="flex-item">
+                <h2>Basket-ball</h2>
+                <div class="pros-cons">
+                    <h3>Avantages :</h3>
+                    <ul>
+                        <li>Développe la coordination et l'agilité.</li>
+                        <li>Accessible dans de nombreux endroits avec des terrains publics.</li>
+                        <li>Encourage l'esprit d'équipe et la stratégie.</li>
+                    </ul>
+                    <h3>Inconvénients :</h3>
+                    <ul>
+                        <li>Peut entraîner des blessures aux genoux et chevilles.</li>
+                        <li>Nécessite souvent un espace intérieur pour des conditions optimales.</li>
+                        <li>Compétitif, ce qui peut être intimidant pour les débutants.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex-item">
+                <h2>Water-polo</h2>
+                <div class="pros-cons">
+                    <h3>Avantages :</h3>
+                    <ul>
+                        <li>Excellent pour la condition physique globale.</li>
+                        <li>Pratique dans l'eau, ce qui est rafraîchissant.</li>
+                        <li>Renforce la capacité pulmonaire et l'endurance.</li>
+                    </ul>
+                    <h3>Inconvénients :</h3>
+                    <ul>
+                        <li>Nécessite une piscine dédiée.</li>
+                        <li>Peut être difficile pour les nageurs moins expérimentés.</li>
+                        <li>Demande beaucoup de contact physique, ce qui peut être éprouvant.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="poll">
+            <h2>Exprimez votre opinion</h2>
+            <p>Quelle est votre opinion sur ces sports ? Notez-les de 1 à 5 :</p>
+            <div>
+                <label>Basket-ball :</label>
+                <input type="radio" name="basketball" value="1"> 1
+                <input type="radio" name="basketball" value="2"> 2
+                <input type="radio" name="basketball" value="3"> 3
+                <input type="radio" name="basketball" value="4"> 4
+                <input type="radio" name="basketball" value="5"> 5
+            </div>
+            <div>
+                <label>Water-polo :</label>
+                <input type="radio" name="waterpolo" value="1"> 1
+                <input type="radio" name="waterpolo" value="2"> 2
+                <input type="radio" name="waterpolo" value="3"> 3
+                <input type="radio" name="waterpolo" value="4"> 4
+                <input type="radio" name="waterpolo" value="5"> 5
+            </div>
+            <button onclick="submitPoll()">Envoyer</button>
+        </div>
+    </div>
+    <footer>
+        <p>&copy; 2025 Comparaison des sports. Tous droits réservés.</p>
+    </footer>
+</body>
+</html>
